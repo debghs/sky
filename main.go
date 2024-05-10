@@ -5,71 +5,71 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
+	"os"
 )
 
-type CityWeather struct {
+type Weather struct {
 	Location struct {
-		City    string `json:"city"`
+		Name    string `json:"name"`
 		Country string `json:"country"`
 	} `json:"location"`
 	Current struct {
 		Temperature float64 `json:"temp_c"`
 		Condition   struct {
-			Description string `json:"description"`
+			Text string `json:"text"`
 		} `json:"condition"`
 	} `json:"current"`
 	Forecast struct {
-		Daily []struct {
-			Hours []struct {
+		Forecastday []struct {
+			Hour []struct {
 				TimeEpoch    int64   `json:"time_epoch"`
-				TemperatureC float64 `json:"temp_c"`
+				TempC        float64 `json:"temp_c"`
 				Condition    struct {
-					Description string `json:"description"`
+					Text string `json:"text"`
 				} `json:"condition"`
 				ChanceOfRain float64 `json:"chance_of_rain"`
-			} `json:"hours"`
-		} `json:"daily"`
+			} `json:"hour"`
+		} `json:"forecastday"`
 	} `json:"forecast"`
 }
 
 func main() {
-	query := "Kolkata"
+	q := "Kolkata"
 
 	if len(os.Args) >= 2 {
-		query = os.Args[1]
+		q = os.Args[1]
 	}
-	response, err := http.Get("http://api.weatherapi.com/v1/forecast.json?key=36ab413e8fa94626894182233241005&q=" + query + "&days=1&aqi=no&alerts=no")
+	res, err := http.Get("http://api.weatherapi.com/v1/forecast.json?key=36ab413e8fa94626894182233241005&q=" + q + "&days=1&aqi=no&alerts=no")
 	if err != nil {
 		panic(err)
 	}
-	defer response.Body.Close()
+	defer res.Body.Close()
 
-	if response.StatusCode != 200 {
-		panic("weather data not available")
+	if res.StatusCode != 200 {
+		panic("not available")
 	}
 
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	var cityWeather CityWeather
-	err = json.Unmarshal(body, &cityWeather)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		panic(err)
 	}
 
-	location, current, dailyForecast := cityWeather.Location, cityWeather.Current, cityWeather.Forecast.Daily[0].Hours
+	var weather Weather
+	err = json.Unmarshal(body, &weather)
+	if err != nil {
+		panic(err)
+	}
 
-	fmt.Printf("%s, %s: %.0f°C. %s\n",
-		location.City,
+	location, current, hours := weather.Location, weather.Current, weather.Forecast.Forecastday[0].Hour
+
+	fmt.Printf("%s, %s: %.0fC.%s\n",
+		location.Name,
 		location.Country,
 		current.Temperature,
-		current.Condition.Description)
+		current.Condition.Text)
 
-	for _, hour := range dailyForecast {
+	for _, hour := range hours {
 		date := time.Unix(hour.TimeEpoch, 0)
 
 		if date.Before(time.Now()) {
@@ -77,17 +77,18 @@ func main() {
 		}
 
 		if hour.ChanceOfRain < 40 {
-			fmt.Printf("%s - %.0f°C, %.0f%%, %s\n",
+			fmt.Printf("%s - %.0fC, %.0f%%, %s\n",
 				date.Format("15:04"),
-				hour.TemperatureC,
+				hour.TempC,
 				hour.ChanceOfRain,
-				hour.Condition.Description)
+				hour.Condition.Text)
 		} else {
-			fmt.Printf("\033[31m%s - %.0f°C, %.0f%%, %s\033[0m\n",
+			fmt.Printf("\033[31m%s - %.0fC, %.0f%%, %s\033[0m\n",
 				date.Format("15:04"),
-				hour.TemperatureC,
+				hour.TempC,
 				hour.ChanceOfRain,
-				hour.Condition.Description)
+				hour.Condition.Text)
 		}
 	}
 }
+
